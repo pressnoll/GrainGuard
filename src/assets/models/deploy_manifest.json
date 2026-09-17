@@ -1,0 +1,222 @@
+{
+  "input": {
+    "shape": [
+      1,
+      224,
+      224,
+      3
+    ],
+    "dtype": "float32",
+    "range": "[0,1]",
+    "note": "the graph rescales [0,1] -> [-1,1] internally; just divide by 255"
+  },
+  "preprocess": [
+    "pad to square with the median border colour - never stretch: 5_BN and 7_IM are partly defined by being smaller and differently shaped than sound kernels",
+    "resize the square to 256, then centre-crop 224 (matches eval exactly)",
+    "divide by 255.0",
+    "beans: resize the whole-heap photo so its shorter edge is 256, then centre-crop 224 (matches the beans eval path - no per-kernel segmentation)"
+  ],
+  "heads": {
+    "crop_order": [
+      "maize",
+      "rice",
+      "wheat",
+      "sorghum"
+    ],
+    "classes": {
+      "maize": [
+        "0_NOR",
+        "1_F&S",
+        "2_SD",
+        "3_MY",
+        "4_AP",
+        "5_BN",
+        "6_HD",
+        "7_IM"
+      ],
+      "rice": [
+        "0_NOR",
+        "1_F&S",
+        "2_SD",
+        "3_MY",
+        "4_AP",
+        "5_BN",
+        "6_UN",
+        "7_IM"
+      ],
+      "wheat": [
+        "0_NOR",
+        "1_F&S",
+        "2_SD",
+        "3_MY",
+        "4_AP",
+        "5_BN",
+        "6_BP",
+        "7_IM"
+      ],
+      "sorghum": [
+        "0_NOR",
+        "1_F&S",
+        "2_SD",
+        "3_MY",
+        "4_AP",
+        "5_BN",
+        "6_HD",
+        "7_IM"
+      ],
+      "beans": [
+        "clean",
+        "infested"
+      ]
+    },
+    "generic": [
+      "sound",
+      "damaged",
+      "impurity"
+    ],
+    "beans": [
+      "clean",
+      "infested"
+    ]
+  },
+  "read": "take the crop head the user selected, and read generic alongside it as a cross-check - generic is the only head that means anything for a grain type this model was never trained on. For beans, read the beans head (output index 5). Look the predicted class up in recommendations.json for the action to take.",
+  "recommendations": "recommendations.json",
+  "tflite": {
+    "float32": {
+      "file": "grainvisual_f32.tflite",
+      "size_mb": 11.83,
+      "outputs": [
+        {
+          "head": "maize",
+          "tensor_index": 202,
+          "tensor_name": "StatefulPartitionedCall_1:0",
+          "shape": [
+            1,
+            8
+          ],
+          "mean_abs_diff": 1.096765208785655e-05
+        },
+        {
+          "head": "rice",
+          "tensor_index": 204,
+          "tensor_name": "StatefulPartitionedCall_1:1",
+          "shape": [
+            1,
+            8
+          ],
+          "mean_abs_diff": 1.0918670341197867e-05
+        },
+        {
+          "head": "wheat",
+          "tensor_index": 208,
+          "tensor_name": "StatefulPartitionedCall_1:2",
+          "shape": [
+            1,
+            8
+          ],
+          "mean_abs_diff": 1.17119243441266e-05
+        },
+        {
+          "head": "sorghum",
+          "tensor_index": 206,
+          "tensor_name": "StatefulPartitionedCall_1:3",
+          "shape": [
+            1,
+            8
+          ],
+          "mean_abs_diff": 9.649515959608834e-06
+        },
+        {
+          "head": "generic",
+          "tensor_index": 200,
+          "tensor_name": "StatefulPartitionedCall_1:4",
+          "shape": [
+            1,
+            3
+          ],
+          "mean_abs_diff": 7.897615432739258e-06
+        },
+        {
+          "head": "beans",
+          "tensor_index": 198,
+          "tensor_name": "StatefulPartitionedCall_1:5",
+          "shape": [
+            1,
+            2
+          ],
+          "mean_abs_diff": 5.318472631188342e-06
+        }
+      ],
+      "argmax_agreement": "144/144",
+      "cpu_ms_per_image": 8.8
+    },
+    "int8 weights": {
+      "file": "grainvisual_int8w.tflite",
+      "size_mb": 3.27,
+      "outputs": [
+        {
+          "head": "maize",
+          "tensor_index": 202,
+          "tensor_name": "StatefulPartitionedCall_1:0",
+          "shape": [
+            1,
+            8
+          ],
+          "mean_abs_diff": 0.26467394828796387
+        },
+        {
+          "head": "rice",
+          "tensor_index": 204,
+          "tensor_name": "StatefulPartitionedCall_1:1",
+          "shape": [
+            1,
+            8
+          ],
+          "mean_abs_diff": 0.32193538546562195
+        },
+        {
+          "head": "wheat",
+          "tensor_index": 208,
+          "tensor_name": "StatefulPartitionedCall_1:2",
+          "shape": [
+            1,
+            8
+          ],
+          "mean_abs_diff": 0.28900495171546936
+        },
+        {
+          "head": "sorghum",
+          "tensor_index": 206,
+          "tensor_name": "StatefulPartitionedCall_1:3",
+          "shape": [
+            1,
+            8
+          ],
+          "mean_abs_diff": 0.21276243031024933
+        },
+        {
+          "head": "generic",
+          "tensor_index": 200,
+          "tensor_name": "StatefulPartitionedCall_1:4",
+          "shape": [
+            1,
+            3
+          ],
+          "mean_abs_diff": 0.20059651136398315
+        },
+        {
+          "head": "beans",
+          "tensor_index": 198,
+          "tensor_name": "StatefulPartitionedCall_1:5",
+          "shape": [
+            1,
+            2
+          ],
+          "mean_abs_diff": 0.1056813895702362
+        }
+      ],
+      "argmax_agreement": "137/144",
+      "cpu_ms_per_image": 18.6
+    }
+  }
+}

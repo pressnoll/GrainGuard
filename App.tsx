@@ -1,45 +1,24 @@
-/**
- * Sample React Native App
- * https://github.com/facebook/react-native
- *
- * @format
- */
+import React from 'react';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-import { NewAppScreen } from '@react-native/new-app-screen';
-import { StatusBar, StyleSheet, useColorScheme, View } from 'react-native';
-import {
-  SafeAreaProvider,
-  useSafeAreaInsets,
-} from 'react-native-safe-area-context';
+import AppNavigator from './src/navigation/AppNavigator';
+import { useAuthStore } from './src/state/authStore';
 
-function App() {
-  const isDarkMode = useColorScheme() === 'dark';
+function App(): React.JSX.Element {
+  const start = useAuthStore(s => s.start);
+
+  React.useEffect(() => {
+    // Deliberately no cleanup. The auth listener is the app's lifetime, not this
+    // component's, and tearing it down on a fast-refresh remount would leave the
+    // store holding a user nobody is watching any more. `start` is idempotent.
+    start();
+  }, [start]);
 
   return (
     <SafeAreaProvider>
-      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-      <AppContent />
+      <AppNavigator />
     </SafeAreaProvider>
   );
 }
-
-function AppContent() {
-  const safeAreaInsets = useSafeAreaInsets();
-
-  return (
-    <View style={styles.container}>
-      <NewAppScreen
-        templateFileName="App.tsx"
-        safeAreaInsets={safeAreaInsets}
-      />
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-});
 
 export default App;

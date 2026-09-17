@@ -1,0 +1,2 @@
+I want you to look at this designs very well this is how i want our UI and UX to look for the application itself and switching between pages.
+We would need to come up with our pages Dashboard is one settings is another we need to find names for pages

@@ -4,6 +4,17 @@
     <style name="AppTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
         <!-- Customize your theme here. -->
         <item name="android:editTextBackground">@drawable/rn_edit_text_material</item>
+
+        <!-- DayNight resolves to a light window on a phone in light mode, which
+             flashes white behind the dark UI on every cold start. The app has one
+             ground colour, so pin it. -->
+        <item name="android:windowBackground">@color/ground</item>
+
+        <!-- The JS side draws the status bar translucent with light content; these
+             match that for the frames rendered before JS boots. -->
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
     </style>
 
 </resources>

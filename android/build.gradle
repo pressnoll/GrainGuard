@@ -15,6 +15,12 @@ buildscript {
         classpath("com.android.tools.build:gradle")
         classpath("com.facebook.react:react-native-gradle-plugin")
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin")
+
+        // Reads android/app/google-services.json at build time and generates the
+        // string resources the Firebase SDK looks up on start. Without it the
+        // native layer never registers a default app and every call throws
+        // "No Firebase App '[DEFAULT]' has been created".
+        classpath("com.google.gms:google-services:4.4.2")
     }
 }
 

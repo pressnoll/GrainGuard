@@ -1,0 +1,148 @@
+{
+  "maize": {
+    "NOR": {
+      "clean": true,
+      "advice": "Sound grain - store under dry, well-ventilated conditions and monitor moisture."
+    },
+    "F&S": {
+      "clean": false,
+      "advice": "Fusarium / sprouted damage - mycotoxin risk. Segregate, dry thoroughly, do not use for food or feed."
+    },
+    "SD": {
+      "clean": false,
+      "advice": "Sun / moisture-damaged - sort out affected kernels and dry before storage."
+    },
+    "MY": {
+      "clean": false,
+      "advice": "Mould present - aflatoxin risk. Discard or test, and fix drying before storage."
+    },
+    "AP": {
+      "clean": false,
+      "advice": "Pest-attacked - insect damage. Treat and seal storage (hermetic) promptly."
+    },
+    "BN": {
+      "clean": false,
+      "advice": "Broken kernels - downgrade. Use soon; broken grain does not store well."
+    },
+    "HD": {
+      "clean": false,
+      "advice": "Heat damage - downgrade. Keep out of premium markets."
+    },
+    "IM": {
+      "clean": false,
+      "advice": "Impurities present - clean / winnow before storage."
+    }
+  },
+  "rice": {
+    "NOR": {
+      "clean": true,
+      "advice": "Sound grain - store under dry, well-ventilated conditions and monitor moisture."
+    },
+    "F&S": {
+      "clean": false,
+      "advice": "Fusarium / sprouted damage - mycotoxin risk. Segregate, dry thoroughly, do not use for food or feed."
+    },
+    "SD": {
+      "clean": false,
+      "advice": "Sun / moisture-damaged - sort out affected kernels and dry before storage."
+    },
+    "MY": {
+      "clean": false,
+      "advice": "Mould present - aflatoxin risk. Discard or test, and fix drying before storage."
+    },
+    "AP": {
+      "clean": false,
+      "advice": "Pest-attacked - insect damage. Treat and seal storage (hermetic) promptly."
+    },
+    "BN": {
+      "clean": false,
+      "advice": "Broken kernels - downgrade. Use soon; broken grain does not store well."
+    },
+    "UN": {
+      "clean": false,
+      "advice": "Rice under-developed - reduced grade. Dry and mill normally."
+    },
+    "IM": {
+      "clean": false,
+      "advice": "Impurities present - clean / winnow before storage."
+    }
+  },
+  "wheat": {
+    "NOR": {
+      "clean": true,
+      "advice": "Sound grain - store under dry, well-ventilated conditions and monitor moisture."
+    },
+    "F&S": {
+      "clean": false,
+      "advice": "Fusarium / sprouted damage - mycotoxin risk. Segregate, dry thoroughly, do not use for food or feed."
+    },
+    "SD": {
+      "clean": false,
+      "advice": "Sun / moisture-damaged - sort out affected kernels and dry before storage."
+    },
+    "MY": {
+      "clean": false,
+      "advice": "Mould present - aflatoxin risk. Discard or test, and fix drying before storage."
+    },
+    "AP": {
+      "clean": false,
+      "advice": "Pest-attacked - insect damage. Treat and seal storage (hermetic) promptly."
+    },
+    "BN": {
+      "clean": false,
+      "advice": "Broken kernels - downgrade. Use soon; broken grain does not store well."
+    },
+    "BP": {
+      "clean": false,
+      "advice": "Wheat black point - downgrade for milling. Segregate the affected lot."
+    },
+    "IM": {
+      "clean": false,
+      "advice": "Impurities present - clean / winnow before storage."
+    }
+  },
+  "sorghum": {
+    "NOR": {
+      "clean": true,
+      "advice": "Sound grain - store under dry, well-ventilated conditions and monitor moisture."
+    },
+    "F&S": {
+      "clean": false,
+      "advice": "Fusarium / sprouted damage - mycotoxin risk. Segregate, dry thoroughly, do not use for food or feed."
+    },
+    "SD": {
+      "clean": false,
+      "advice": "Sun / moisture-damaged - sort out affected kernels and dry before storage."
+    },
+    "MY": {
+      "clean": false,
+      "advice": "Mould present - aflatoxin risk. Discard or test, and fix drying before storage."
+    },
+    "AP": {
+      "clean": false,
+      "advice": "Pest-attacked - insect damage. Treat and seal storage (hermetic) promptly."
+    },
+    "BN": {
+      "clean": false,
+      "advice": "Broken kernels - downgrade. Use soon; broken grain does not store well."
+    },
+    "HD": {
+      "clean": false,
+      "advice": "Heat damage - downgrade. Keep out of premium markets."
+    },
+    "IM": {
+      "clean": false,
+      "advice": "Impurities present - clean / winnow before storage."
+    }
+  },
+  "beans": {
+    "clean": {
+      "clean": true,
+      "advice": "No pest damage detected - continue normal storage monitoring."
+    },
+    "infested": {
+      "clean": false,
+      "advice": "Cowpea storage weevils (bruchids) detected - heat-treat the lot, store in hermetic / PICS bags, and segregate infested grain."
+    }
+  }
+}

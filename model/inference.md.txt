@@ -1,0 +1,210 @@
+"""
+GrainVisual app inference script.
+
+Single entry point: predict(image_path, selected_head)
+  - selected_head in {"maize","rice","wheat","sorghum"}: segments the photo into
+    individual kernels first, classifies each one, returns an aggregated summary.
+  - selected_head == "beans": classifies the whole photo directly (no segmentation),
+    matching how the beans head was trained (whole-heap photos).
+
+Needs, sitting next to this script: grainvisual_f32.tflite (or int8 variant),
+deploy_manifest.json, recommendations.json — all produced by CELL I / CELL 70.
+"""
+import json
+import os
+
+import numpy as np
+import tensorflow as tf
+from PIL import Image
+from scipy import ndimage as ndi
+from skimage.filters import threshold_otsu
+from skimage.feature import peak_local_max
+from skimage.segmentation import watershed
+
+GRAIN_HEADS = ("maize", "rice", "wheat", "sorghum")
+
+
+# ===================== manifest / recommendations =====================
+def _load_manifest(manifest_path, tag):
+    with open(manifest_path) as f:
+        manifest = json.load(f)
+    entry = manifest["tflite"][tag]
+    idx_map = {row["head"]: row["tensor_index"] for row in entry["outputs"]}
+    return manifest, idx_map, entry["file"]
+
+
+def _load_recommendations(path):
+    if not os.path.exists(path):
+        return {}
+    with open(path) as f:
+        return json.load(f)
+
+
+# ===================== preprocessing (must match training exactly) =====
+def _pad_square_resize(img, canvas):
+    img = img.convert("RGB")
+    w, h = img.size
+    side = max(w, h)
+    a = np.asarray(img)
+    border = np.concatenate([a[:4].reshape(-1, 3), a[-4:].reshape(-1, 3),
+                              a[:, :4].reshape(-1, 3), a[:, -4:].reshape(-1, 3)])
+    fill = tuple(int(v) for v in np.median(border, axis=0))
+    out = Image.new("RGB", (side, side), fill)
+    out.paste(img, ((side - w) // 2, (side - h) // 2))
+    return out.resize((canvas, canvas), Image.BILINEAR)
+
+
+def _grain_preprocess(pil_img, canvas, img_size):
+    padded = _pad_square_resize(pil_img, canvas)
+    arr = np.asarray(padded, dtype=np.float32) / 255.0
+    o = (canvas - img_size) // 2
+    return arr[o:o + img_size, o:o + img_size, :]
+
+
+def _beans_preprocess(pil_img, bstored, bimg):
+    rgb = pil_img.convert("RGB")
+    arr = np.asarray(rgb, dtype=np.float32)
+    h, w = arr.shape[:2]
+    f = min(h, w) / bstored
+    nh, nw = round(h / f), round(w / f)
+    img = tf.image.resize(arr, [nh, nw]).numpy()
+    oh, ow = (nh - bimg) // 2, (nw - bimg) // 2
+    return img[oh:oh + bimg, ow:ow + bimg, :] / 255.0
+
+
+# ===================== kernel segmentation (only used for grain heads) =
+def _segment_kernels(img, min_area_frac=0.0004, max_area_frac=0.15, pad_frac=0.15, min_distance=8):
+    rgb = np.asarray(img.convert("RGB"))
+    gray = np.asarray(img.convert("L"))
+    h, w = gray.shape
+    total_area = h * w
+    try:
+        thr = threshold_otsu(gray)
+    except ValueError:
+        return [], []
+    border = np.concatenate([gray[:4].ravel(), gray[-4:].ravel(),
+                              gray[:, :4].ravel(), gray[:, -4:].ravel()])
+    fg = gray < thr if border.mean() > thr else gray > thr
+    fg = ndi.binary_opening(fg, np.ones((3, 3), bool))
+    fg = ndi.binary_fill_holes(fg)
+    distance = ndi.distance_transform_edt(fg)
+    coords = peak_local_max(distance, min_distance=min_distance, labels=fg)
+    markers = np.zeros(distance.shape, dtype=int)
+    for idx, (r, c) in enumerate(coords, 1):
+        markers[r, c] = idx
+    markers = ndi.label(markers > 0)[0]
+    labels_ws = watershed(-distance, markers, mask=fg)
+
+    kernel_crops, boxes = [], []
+    for i in range(1, labels_ws.max() + 1):
+        mask = labels_ws == i
+        area = int(mask.sum())
+        frac = area / total_area
+        if frac < min_area_frac or frac > max_area_frac:
+            continue
+        ys, xs = np.where(mask)
+        y0, y1, x0, x1 = int(ys.min()), int(ys.max()), int(xs.min()), int(xs.max())
+        bh, bw = y1 - y0, x1 - x0
+        py, px = int(bh * pad_frac), int(bw * pad_frac)
+        y0p, y1p = max(0, y0 - py), min(h, y1 + py)
+        x0p, x1p = max(0, x0 - px), min(w, x1 + px)
+        kernel_crops.append(Image.fromarray(rgb[y0p:y1p, x0p:x1p]))
+        boxes.append((x0p, y0p, x1p, y1p))
+    return kernel_crops, boxes
+
+
+# ===================== the model wrapper =====================
+class GrainVisualModel:
+    def __init__(self, base_dir, tag="float32", canvas=256, img_size=224, bstored=256, bimg=224):
+        self.manifest, self.idx_map, tflite_file = _load_manifest(
+            os.path.join(base_dir, "deploy_manifest.json"), tag)
+        self.recommendations = _load_recommendations(os.path.join(base_dir, "recommendations.json"))
+        self.itp = tf.lite.Interpreter(model_path=os.path.join(base_dir, tflite_file))
+        self.itp.allocate_tensors()
+        self.input_detail = self.itp.get_input_details()[0]
+        self.canvas, self.img_size = canvas, img_size
+        self.bstored, self.bimg = bstored, bimg
+        self.classes = self.manifest["heads"]["classes"]
+
+    def _run_single(self, x, head):
+        tensor_index = self.idx_map[head]
+        xb = x[None, ...].astype(self.input_detail["dtype"])
+        self.itp.set_tensor(self.input_detail["index"], xb)
+        self.itp.invoke()
+        out = self.itp.get_tensor(tensor_index)[0]
+        return tf.nn.softmax(out).numpy()
+
+    def classify_kernel(self, pil_img, head):
+        x = _grain_preprocess(pil_img, self.canvas, self.img_size)
+        probs = self._run_single(x, head)
+        label = int(probs.argmax())
+        return self.classes[head][label], float(probs.max())
+
+    def classify_beans(self, pil_img):
+        x = _beans_preprocess(pil_img, self.bstored, self.bimg)
+        probs = self._run_single(x, "beans")
+        label = int(probs.argmax())
+        return self.classes["beans"][label], float(probs.max())
+
+    def recommend(self, head, class_name):
+        return self.recommendations.get(head, {}).get(class_name)
+
+
+# ===================== THE APP ENTRY POINT =====================
+def predict(gv_model, image_path, selected_head,
+            min_area_frac=0.0004, max_area_frac=0.15, min_distance=8):
+    """Call this from the app. selected_head = whatever the user picked in the UI
+    ('maize'/'rice'/'wheat'/'sorghum'/'beans'). Returns a JSON-serializable dict."""
+    selected_head = selected_head.lower()
+
+    if selected_head == "beans":
+        class_name, conf = gv_model.classify_beans(Image.open(image_path))
+        return {
+            "mode": "beans",
+            "path": image_path,
+            "prediction": class_name,
+            "confidence": round(conf, 4),
+            "recommendation": gv_model.recommend("beans", class_name),
+        }
+
+    if selected_head not in GRAIN_HEADS:
+        raise ValueError(f"selected_head must be one of {GRAIN_HEADS + ('beans',)}, got {selected_head!r}")
+
+    raw = Image.open(image_path)
+    kernel_crops, boxes = _segment_kernels(raw, min_area_frac, max_area_frac, min_distance=min_distance)
+    if not kernel_crops:
+        return {"mode": "grain", "path": image_path, "species": selected_head,
+                "n_kernels": 0, "counts": {}, "kernels": []}
+
+    kernels = []
+    counts = {}
+    for crop_img, box in zip(kernel_crops, boxes):
+        class_name, conf = gv_model.classify_kernel(crop_img, selected_head)
+        counts[class_name] = counts.get(class_name, 0) + 1
+        kernels.append({
+            "box": [int(v) for v in box],
+            "class": class_name,
+            "confidence": round(conf, 4),
+            "recommendation": gv_model.recommend(selected_head, class_name),
+        })
+
+    return {
+        "mode": "grain",
+        "path": image_path,
+        "species": selected_head,
+        "n_kernels": len(kernels),
+        "counts": counts,
+        "kernels": kernels,
+    }
+
+
+# ===================== example =====================
+if __name__ == "__main__":
+    BASE_DIR = "."
+    gv = GrainVisualModel(BASE_DIR, tag="float32")
+
+    result = predict(gv, "images/maize.jpg", selected_head="maize")
+    print(json.dumps(result, indent=2)[:800])
+
+    result2 = predict(gv, "images/cowpea.jpg", selected_head="beans")
+    print(json.dumps(result2, indent=2))

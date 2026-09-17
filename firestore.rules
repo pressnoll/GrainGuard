@@ -1,0 +1,168 @@
+rules_version = '2';
+
+/**
+ * GrainGuard security rules.
+ *
+ * Two ownership models sit side by side. A profile belongs to exactly one
+ * account: `users/{uid}` is readable and writable only by that uid, and nothing
+ * in the app ever enumerates the collection, so `list` is refused outright.
+ * Telemetry belongs to a store rather than a person, because a cooperative has
+ * one set of silos and several people reading them — so every document under
+ * `facilities/{fid}` is gated on membership of that facility's `memberUids`,
+ * which is the one array to append to when a colleague is added later.
+ *
+ * Three things here are deliberate and worth reading before changing them.
+ *
+ * Reads on the facility document itself test `resource.data.memberUids`
+ * directly, never a `get()`. That keeps the common case free, and it is what
+ * makes the sign-in query — `where('memberUids', 'array-contains', uid)` — legal:
+ * the constraint guarantees every document the query can return already
+ * satisfies the rule. Widen that rule and the query starts failing wholesale.
+ *
+ * Subcollections reach for the parent with `get()`. A missing parent therefore
+ * denies both reads and writes: orphan telemetry cannot be created by a mobile
+ * client and cannot bypass facility membership. Sign-up creates only the parent
+ * facility and profile pointer; probe records are added after that commit.
+ *
+ * Ownership is immutable and membership is the owner's to change. A member can
+ * edit the store, its limits and its silos, but cannot write themselves in as
+ * owner or quietly remove the person who created it.
+ */
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function self(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    /** Keys this write touches — used to hold updates to a known field set. */
+    function touches(allowed) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(allowed);
+    }
+
+    function facilityPath(fid) {
+      return /databases/$(database)/documents/facilities/$(fid);
+    }
+
+    /** Owner access also covers older facilities whose member list is absent. */
+    function mayAccessFacility(data) {
+      return signedIn()
+             && (
+                  data.get('ownerUid', '') == request.auth.uid
+                  || request.auth.uid in data.get('memberUids', [])
+                );
+    }
+
+    /**
+     * Membership of the parent store. A `get()` against a facility that does not
+     * exist errors, which denies — the right answer for a read, and the reason
+     * `mayWriteUnder` cannot simply call this first.
+     */
+    function isMember(fid) {
+      return mayAccessFacility(get(facilityPath(fid)).data);
+    }
+
+    /** Membership is required before a phone writes any facility child. */
+    function mayWriteUnder(fid) {
+      return isMember(fid);
+    }
+
+    // ── Profiles ─────────────────────────────────────────────────────
+    //
+    // `email` and `lastSeenAt` are in the update set because every launch
+    // refreshes them from the auth provider.
+
+    match /users/{userId} {
+      allow get: if self(userId);
+      allow list: if false;
+
+      allow create: if self(userId)
+                    && request.resource.data.keys().hasAll(['displayName', 'email'])
+                    && request.resource.data.displayName is string
+                    && request.resource.data.email is string;
+
+      allow update: if self(userId)
+                    && touches([
+                         'displayName', 'email', 'phone', 'photoURL', 'role',
+                         'facilityId', 'notifications', 'lastSeenAt', 'updatedAt',
+                       ]);
+
+      // Deleting a profile would orphan the store it points at. Removing an
+      // account is an admin action, not something the app offers.
+      allow delete: if false;
+    }
+
+    // ── Stores ───────────────────────────────────────────────────────
+
+    match /facilities/{fid} {
+      // Direct reads support both owners and members. List queries remain tied
+      // to `memberUids` because Firestore rules are not result filters: the
+      // app's array-contains query must prove every returned document is safe.
+      allow get: if mayAccessFacility(resource.data);
+      allow list: if signedIn()
+                  && (
+                       resource.data.get('ownerUid', '') == request.auth.uid
+                       || request.auth.uid in resource.data.get('memberUids', [])
+                     );
+
+      allow create: if signedIn()
+                    && request.resource.data.ownerUid == request.auth.uid
+                    && request.resource.data.memberUids == [request.auth.uid]
+                    && request.resource.data.name is string;
+
+      allow update: if mayAccessFacility(resource.data)
+                    && request.resource.data.ownerUid == resource.data.ownerUid
+                    && (
+                         request.resource.data.memberUids == resource.data.memberUids
+                         || request.auth.uid == resource.data.ownerUid
+                       );
+
+      allow delete: if signedIn() && request.auth.uid == resource.data.ownerUid;
+
+      // The current state of each silo: written when an operator registers or
+      // edits one, when a vision scan is promoted, and when the phone atomically
+      // promotes a validated acoustic inbox event plus its DHT reading.
+      match /silos/{siloId} {
+        allow read: if isMember(fid);
+        allow create, update: if mayWriteUnder(fid);
+        allow delete: if false;
+      }
+
+      // Gateway-owned ingress. Facility members may listen so one signed-in
+      // phone can perform local RF inference, but no mobile client can forge,
+      // edit, acknowledge, or delete a probe event.
+      match /acousticInbox/{eventId} {
+        allow read: if isMember(fid);
+        allow create, update, delete: if false;
+      }
+
+      // History. These are records of measurements that were taken, so nothing
+      // here is editable after the fact and nothing is deletable from a phone —
+      // the retention setting is for a scheduled cleanup to enforce, server side.
+      match /acousticEvents/{eventId} {
+        allow read: if isMember(fid);
+        allow create: if mayWriteUnder(fid);
+        allow update, delete: if false;
+      }
+
+      match /visionScans/{scanId} {
+        allow read: if isMember(fid);
+        allow create: if mayWriteUnder(fid);
+        allow update, delete: if false;
+      }
+    }
+
+    // Rules are a union of permissions, so this grants nothing and blocks
+    // nothing: it states the default that already applies. Any path not matched
+    // by a rule above — a typo'd collection, a feature added without rules — is
+    // denied outright rather than left open.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

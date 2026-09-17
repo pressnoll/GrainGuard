@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!--
+      Mirrors colors.ground in src/core/theme.ts.
+
+      The native window is painted before the React view exists, so this value is
+      what the user sees for the first few hundred milliseconds of a cold start.
+      Keep it identical to the JS ground colour or launching the app flashes.
+    -->
+    <color name="ground">#0B0F0D</color>
+
+</resources>

@@ -41,6 +41,11 @@ node_modules/
 npm-debug.log
 yarn-error.log
 
+# Local environment variables and credentials
+.env
+.env.*
+!.env.example
+
 # fastlane
 #
 # It is recommended to not store the screenshots in the git repo. Instead, use fastlane to re-generate the
@@ -73,3 +78,16 @@ yarn-error.log
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
+
+# Firebase
+#
+# The Android and iOS config files are not secrets in the cryptographic sense —
+# an Android API key is meant to be embedded, and is restricted by package name
+# and signing certificate — but they identify the project and belong to whoever
+# owns the console, not to the repository. Each developer downloads their own.
+# Deleting these lines is a decision, not a tidy-up: it puts the project id and
+# key into every clone and every fork.
+android/app/google-services.json
+ios/GoogleService-Info.plist
+.firebase/
+firebase-debug.log
